@@ -59,4 +59,5 @@ def visualisation_donnees_manquantes(dataframe):
 
 
 def verifcation():
-    print("new fonction")
+    nom_auteur = ["DAOUDA"]
+    return nom_auteur
