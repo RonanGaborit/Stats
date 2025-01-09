@@ -72,8 +72,12 @@ def verifcation():
 
 def setup_plot():
     from aquarel import load_theme
-    import seaborn as sns
-
+    import matplotlib.pyplot as plt
+    import matplotlib.font_manager as fm
+    import logging
+    logging.getLogger("matplotlib").setLevel(logging.CRITICAL)
+    font_prop = fm.FontProperties(fname="Helvetica.ttf")
+    plt.rcParams["font.family"] = font_prop.get_name()
     theme = load_theme("minimal_light")
     theme.apply()
 
