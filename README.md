@@ -5,6 +5,7 @@
 git clone https://github.com/utilisateur/repo.git
 ## Créer une nouvelle branche
 git checkout -b nouvelle-branche
+
 ## Ajouter des modifications et les valider
 git add .
 
@@ -17,6 +18,7 @@ git push origin nouvelle-branche
 Sur GitHub, allez dans votre dépôt, sélectionnez votre branche et cliquez sur "New Pull Request" .
 
 ## Gérer les versions
+
 ### Voir l'historique
 git log 
 git revert <commit-id>  
