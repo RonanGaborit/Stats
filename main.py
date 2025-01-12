@@ -1,15 +1,179 @@
-from ressources.reader_csv import *
-from fonction import *
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+from pandas import DataFrame
+from typing import List
+from matplotlib import pyplot as plt, patches
+from pre_processing import data_clean
+from statsmodels.regression.linear_model import RegressionResults
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error
+from statsmodels.stats.diagnostic import het_goldfeldquandt
+import statsmodels.api as sm
 
 
-print(verifcation())
-dataframe = load_data()
-print(dataframe.head())  # Display the first few rows of the DataFrame
-print(dataframe.columns)
-print(dataframe.shape)
-print(dataframe.info())
+data_cleaned = data_clean()
+data_cleaned.info()
 
-new_data = visualisation_donnees_manquantes(dataframe)
-print(new_data.shape)
-print(new_data.columns)
+# data_cleaned.to_csv("data1.csv", index=False)
 
+#encoder les variables quantitatives
+data_cleaned = pd.get_dummies(data_cleaned, columns=['Genre', 'Domaine', 'situation'], drop_first=True)
+
+# encoder et normaliser valeurs numériques
+numerical_cols = [
+    "Taux d’insertion", 'Part des emplois de niveau cadre', 'Part des emplois stables',
+    'Part des emplois à temps plein', 'Salaire brut annuel estimé',
+    'Part des diplômés boursiers dans la discipline', 'Taux de chômage national'
+]
+
+scaler = StandardScaler()
+data_cleaned[numerical_cols] = scaler.fit_transform(data_cleaned[numerical_cols])
+
+
+# Pairplot1 Colonnes numériques
+numeric_cols1 = [
+    "Taux d’insertion", 'Salaire brut annuel estimé',
+    'Part des diplômés boursiers dans la discipline', 'Taux de chômage national'
+]
+
+# Pairplot1 pour distinguer les groupes
+sns.set_context("notebook", font_scale=0.6)
+sns.pairplot(data_cleaned[numeric_cols1])
+#Modifier la taille des textes sur l'axe Y pour chaque sous-graphique
+
+plt.show()
+
+# Pairplot2 Colonnes numériques
+numeric_cols2 = [
+    "Taux d’insertion", "Part des emplois de niveau cadre", "Part des emplois stables",
+    "Part des emplois à temps plein"
+]
+
+# Pairplot2 pour distinguer les groupes
+sns.set_context("notebook", font_scale=0.6)
+sns.pairplot(data_cleaned[numeric_cols2])
+# Modifier la taille des textes sur l'axe Y pour chaque sous-graphique
+plt.show()
+
+
+#from sklearn.model_selection import train_test_split
+
+
+X = data_cleaned.drop(columns=['Taux d’insertion'])
+y = data_cleaned['Taux d’insertion']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+# Évaluez le modèle
+print("R² :", r2_score(y_test, y_pred))
+print("Erreur quadratique moyenne :", mean_squared_error(y_test, y_pred))
+
+coefficients = pd.DataFrame({
+    'Variable': X_train.columns,
+    'Coefficient': model.coef_
+}).sort_values(by='Coefficient', ascending=False)
+
+print(coefficients)
+
+plt.scatter(y_test, y_pred)
+plt.xlabel("Valeurs réelles")
+plt.ylabel("Valeurs prédites")
+plt.title("Comparaison des valeurs réelles et prédites")
+plt.show()
+
+
+#densité résidus
+residuals = y_test - y_pred
+# Tracer la distribution des résidus
+plt.figure(figsize=(12, 8))
+sns.kdeplot(residuals, fill=True, color="blue", alpha=0.6, label="Résidus")
+plt.axvline(np.mean(residuals), color="red", linestyle="--", label="Moyenne des résidus")
+
+# Ajouter une courbe normale
+sns.kdeplot(
+    np.random.normal(np.mean(residuals), np.std(residuals), len(residuals)),
+    color="green", linestyle="--", label="Distribution normale"
+)
+
+# Ajouter les légendes et le titre
+plt.title("Distribution des Résidus", fontweight="bold")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+#homoscédacité
+# Tracer les résidus vs les valeurs prédites
+plt.figure(figsize=(12, 8))
+plt.scatter(y_pred, residuals, alpha=0.6, color="blue")
+plt.axhline(0, color="red", linestyle="--")
+plt.xlabel("Valeurs prédites")
+plt.ylabel("Résidus")
+plt.title("Valeurs prédites vs Résidus")
+plt.grid(True)
+plt.show()
+
+print(X_test.head(10))  # Afficher les 10 premières lignes
+
+#changer variables booléennes en numérique
+#id les variables bool
+bool_columns = X_test.select_dtypes(include=['bool']).columns
+print("Colonnes booléennes :", bool_columns)
+#changer bool en num
+X_test[bool_columns] = X_test[bool_columns].astype(int)
+#verifier le type des variables
+bool_columns = X_test.select_dtypes(include=['bool']).columns
+print("Colonnes booléennes :", bool_columns)
+
+
+# Étape 1 : Calculer les résidus
+residuals = y_test - y_pred  # y_test : valeurs réelles, y_pred : valeurs prédites
+
+# Étape 2 : Ajouter une constante à X_test (si nécessaire)
+X_test_with_const = sm.add_constant(X_test)
+
+# Étape 3 : Effectuer le test de Goldfeld-Quandt
+test_stat, p_value, _ = het_goldfeldquandt(residuals, X_test_with_const)
+
+# Étape 4 : Afficher les résultats
+print("Statistique du test Goldfeld-Quandt :", test_stat)
+print("p-value :", p_value)
+
+if p_value > 0.05:
+    print("Aucune preuve d'hétéroscédasticité (p > 0.05)")
+else:
+    print("Présence d'hétéroscédasticité (p <= 0.05)")
+
+# Tracer la fonction d'autocorrélation des résidus
+sm.graphics.tsa.plot_acf(residuals, lags=40)
+plt.title("Autocorrélation des Résidus")
+plt.xlabel("Lags")
+plt.ylabel("Autocorrélation")
+plt.grid(True)
+plt.show()
+
+
+# 5 -Calculer la matrice de corrélation
+correlation_matrix = X_train.corr()
+
+# Afficher la matrice de corrélation sous forme de heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title("Matrice de Corrélation des Variables Explicatives", fontweight="bold")
+plt.show()
+
+# Identifier les paires de variables fortement corrélées
+threshold = 0.8
+high_corr = correlation_matrix[(correlation_matrix > threshold) | (correlation_matrix < -threshold)].stack()
+high_corr = high_corr[high_corr.index.get_level_values(0) != high_corr.index.get_level_values(1)].drop_duplicates()
+print("Variables fortement corrélées :")
+print(high_corr)
